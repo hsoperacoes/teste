@@ -290,7 +290,7 @@
     }catch(err){
       setStatus(
         "ERRO Dynamsoft:\n" + (err && (err.message || err.toString()) ? (err.message || err.toString()) : String(err)) +
-        "\n\nDICAS:\n- Cole a licença real em COLE_SUA_LICENCA_AQUI\n- Teste em HTTPS (GitHub Pages)\n- Permita câmera no Chrome",
+        "\n\nDICAS:\n- Cole a licença real em DLS2eyJoYW5kc2hha2VDb2RlIjoiMTA1MDEzMzM1LU1UQTFNREV6TXpNMUxYZGxZaTFVY21saGJGQnliMm8iLCJtYWluU2VydmVyVVJMIjoiaHR0cHM6Ly9tZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwib3JnYW5pemF0aW9uSUQiOiIxMDUwMTMzMzUiLCJzdGFuZGJ5U2VydmVyVVJMIjoiaHR0cHM6Ly9zZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwiY2hlY2tDb2RlIjoxNzIwODEyNjE2fQ==\n- Teste em HTTPS (GitHub Pages)\n- Permita câmera no Chrome",
         "err"
       );
     }
