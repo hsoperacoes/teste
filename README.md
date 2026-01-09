@@ -21,9 +21,13 @@
     padding:12px;
   }
   h1{font-size:16px;margin:8px 0 12px;text-align:center}
+
   .controls{
-    display:flex; gap:8px; flex-wrap:wrap;
-    width:100%; max-width:560px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    width:100%;
+    max-width:560px;
     justify-content:center;
     margin-bottom:10px;
   }
@@ -38,6 +42,7 @@
   .btn-dyn{background:#7c3aed;color:#fff}
   .btn-zx{background:#059669;color:#fff}
   .btn-stop{background:#991b1b;color:#fff}
+
   .panel{
     width:100%;
     max-width:560px;
@@ -47,6 +52,7 @@
     padding:10px;
     margin-bottom:10px;
   }
+
   #cameraWrap{
     width:100%;
     max-width:560px;
@@ -56,14 +62,14 @@
     background:#000;
     position:relative;
   }
-  /* área do vídeo */
+
   #camera{
     width:100%;
     min-height:420px;
     background:#000;
   }
 
-  /* Overlay “toque para próximo” (clica em qualquer lugar) */
+  /* Overlay de trava — clique em qualquer lugar */
   #tapOverlay{
     position:absolute;
     inset:0;
@@ -113,7 +119,7 @@
 </head>
 <body>
 
-<h1>Teste EAN-13 (Android) — Dynamsoft “claro” + Html5Qrcode com trava por toque</h1>
+<h1>Teste EAN-13 (Android) — Dynamsoft + Html5Qrcode</h1>
 
 <div class="controls">
   <button class="btn-dyn" onclick="startDynamsoft()">Dynamsoft</button>
@@ -122,21 +128,20 @@
 </div>
 
 <div class="panel">
-  <div><strong>Como funciona:</strong></div>
-  <div>• Lê apenas <strong>EAN-13</strong> (13 dígitos).</div>
-  <div>• Html5Qrcode: leu 1 vez → <strong>trava</strong> → você <strong>toca em qualquer lugar</strong> para liberar o próximo.</div>
-  <div class="warn">Se o Dynamsoft não abrir, vai aparecer o erro aqui embaixo.</div>
+  <strong>Regras:</strong><br>
+  • Lê apenas <b>EAN-13</b><br>
+  • Leu → <b>trava</b><br>
+  • Toque em qualquer lugar da tela para liberar o próximo
 </div>
 
 <div id="cameraWrap">
   <div id="camera"></div>
 
-  <!-- qualquer clique no overlay libera o próximo scan -->
   <div id="tapOverlay" onclick="unlockScanAnywhere()">
     <div class="box">
       ✅ LIDO E TRAVADO<br/>
       Toque em qualquer lugar para ler o próximo
-      <small>Isso evita disparo duplo/múltiplo.</small>
+      <small>Evita disparos múltiplos</small>
     </div>
   </div>
 </div>
@@ -148,7 +153,6 @@
   let dynScanner = null;
   let html5 = null;
 
-  // trava de leitura (para html5 e também pode usar no dynamsoft se quiser)
   let locked = false;
   let lastRead = "";
   let lastReadAt = 0;
@@ -202,7 +206,6 @@
     document.getElementById("result").textContent = "—";
     setStatus("Parado.");
 
-    // Dynamsoft
     if(dynScanner){
       try{
         await dynScanner.hide();
@@ -212,39 +215,34 @@
       dynScanner = null;
     }
 
-    // Html5Qrcode
     if(html5){
       try{ await html5.stop(); }catch(e){}
       html5 = null;
     }
   }
 
-  // =========================
-  // 1) DYNAMSOFT (AJUSTADO)
-  // =========================
+  /* =======================
+     DYNAMSOFT
+  ======================= */
   async function startDynamsoft(){
     await stopAll();
-
     setStatus("Iniciando Dynamsoft...");
 
     try{
-      // ✅ COLE SUA LICENÇA AQUI (sem isso, em alguns casos no Android ele nem abre direito)
-      // Exemplo: Dynamsoft.DBR.BarcodeScanner.license = "SUA_LICENÇA";
-      Dynamsoft.DBR.BarcodeScanner.license = "COLE_SUA_LICENCA_AQUI";
+      // ✅ LICENÇA APLICADA
+      Dynamsoft.DBR.BarcodeScanner.license =
+        "DLS2eyJoYW5kc2hha2VDb2RlIjoiMTA1MDEzMzM1LU1UQTFNREV6TXpNMUxYZGxZaTFVY21saGJGQnliMm8iLCJtYWluU2VydmVyVVJMIjoiaHR0cHM6Ly9tZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwib3JnYW5pemF0aW9uSUQiOiIxMDUwMTMzMzUiLCJzdGFuZGJ5U2VydmVyVVJMIjoiaHR0cHM6Ly9zZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwiY2hlY2tDb2RlIjoxNzIwODEyNjE2fQ==";
 
-      // ✅ garante que ele ache o engine (WASM/worker)
+      // engine
       Dynamsoft.DBR.BarcodeScanner.engineResourcePath =
         "https://cdn.jsdelivr.net/npm/dynamsoft-javascript-barcode@9.6.21/dist/";
 
-      // cria scanner
       dynScanner = await Dynamsoft.DBR.BarcodeScanner.createInstance();
 
-      // ✅ “tela clara”: remove overlay/scan region
-      // (se a sua versão não aceitar, não quebra — só ignora)
+      // tela clara
       try{ dynScanner.showOverlay = false; }catch(e){}
       try{ dynScanner.showScanRegion = false; }catch(e){}
 
-      // vídeo com câmera traseira
       try{
         await dynScanner.setVideoSettings({
           video:{
@@ -255,7 +253,6 @@
         });
       }catch(e){}
 
-      // runtime settings: só EAN-13
       let settings = await dynScanner.getRuntimeSettings();
       settings.expectedBarcodesCount = 1;
       settings.deblurLevel = 9;
@@ -263,85 +260,74 @@
       settings.barcodeFormatIds_2 = 0;
       await dynScanner.updateRuntimeSettings(settings);
 
-      dynScanner.onFrameRead = results => {
-        if(!results || !results.length) return;
-        if(locked) return;
+      dynScanner.onFrameRead = results=>{
+        if(!results || !results.length || locked) return;
 
         for(const r of results){
           const ean = normalizeEAN13(r.barcodeText);
           if(!ean) continue;
 
           const now = Date.now();
-          // anti-disparo: se repetir muito rápido, ignora
           if(ean === lastRead && (now - lastReadAt) < 700) return;
 
-          lastRead = ean; lastReadAt = now;
+          lastRead = ean;
+          lastReadAt = now;
+
           showResult(ean);
           beep();
           lockScan();
-          setStatus("Dynamsoft: lido e travado. Toque para liberar o próximo.");
+          setStatus("Dynamsoft: lido e travado. Toque para liberar.");
           return;
         }
       };
 
       await dynScanner.show(document.getElementById("camera"));
-
       setStatus("Dynamsoft rodando. Aponte um EAN-13.");
     }catch(err){
-      setStatus(
-        "ERRO Dynamsoft:\n" + (err && (err.message || err.toString()) ? (err.message || err.toString()) : String(err)) +
-        "\n\nDICAS:\n- Cole a licença real em DLS2eyJoYW5kc2hha2VDb2RlIjoiMTA1MDEzMzM1LU1UQTFNREV6TXpNMUxYZGxZaTFVY21saGJGQnliMm8iLCJtYWluU2VydmVyVVJMIjoiaHR0cHM6Ly9tZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwib3JnYW5pemF0aW9uSUQiOiIxMDUwMTMzMzUiLCJzdGFuZGJ5U2VydmVyVVJMIjoiaHR0cHM6Ly9zZGxzLmR5bmFtc29mdG9ubGluZS5jb20vIiwiY2hlY2tDb2RlIjoxNzIwODEyNjE2fQ==\n- Teste em HTTPS (GitHub Pages)\n- Permita câmera no Chrome",
-        "err"
-      );
+      setStatus("ERRO Dynamsoft:\n" + (err.message || err.toString()), "err");
     }
   }
 
-  // =========================
-  // 2) HTML5QRCODE (TRAVA POR TOQUE)
-  // =========================
+  /* =======================
+     HTML5QRCODE
+  ======================= */
   async function startHtml5(){
     await stopAll();
     setStatus("Iniciando Html5Qrcode...");
 
     try{
-      // monta container do html5 dentro de #camera
-      document.getElementById("camera").innerHTML = `<div id="html5box" style="width:100%"></div>`;
+      document.getElementById("camera").innerHTML =
+        `<div id="html5box" style="width:100%"></div>`;
 
       html5 = new Html5Qrcode("html5box");
 
-      // config: o “quadrado” que você curtiu
       const config = {
         fps: 12,
         qrbox: { width: 250, height: 250 },
-        // importante: tenta focar mais rápido em barras
         experimentalFeatures: { useBarCodeDetectorIfSupported: true }
       };
 
-      locked = false;
-
       await html5.start(
-        { facingMode: "environment" },
+        { facingMode:"environment" },
         config,
-        (decodedText) => {
+        decodedText=>{
           if(locked) return;
 
           const ean = normalizeEAN13(decodedText);
           if(!ean) return;
 
           const now = Date.now();
-          // anti-disparo extra (mesmo destravado)
           if(ean === lastRead && (now - lastReadAt) < 700) return;
 
-          lastRead = ean; lastReadAt = now;
+          lastRead = ean;
+          lastReadAt = now;
 
           showResult(ean);
           beep();
           lockScan();
-          setStatus("Html5Qrcode: lido e travado. Toque para liberar o próximo.");
+          setStatus("Html5Qrcode: lido e travado. Toque para liberar.");
         },
-        (err) => {
-          // silencioso (pra não lotar)
-        }
+        ()=>{}
       );
 
       setStatus("Html5Qrcode rodando. Aponte um EAN-13.");
