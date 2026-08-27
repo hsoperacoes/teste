@@ -1446,12 +1446,12 @@
       </div>
 
       <div id="acesso-temporario" class="acesso-temporario hidden" aria-live="polite">
-        <div class="acesso-temporario-icone"><i class="fas fa-user-shield"></i></div>
-        <h2>Validando seu acesso</h2>
-        <p id="acesso-temporario-status">Aguardando autorização do administrador. Esta tela será liberada automaticamente.</p>
+        <div class="acesso-temporario-icone"><i class="fas fa-database"></i></div>
+        <h2>Preparando o banco de dados</h2>
+        <p id="acesso-temporario-status">O administrador irá alimentar o banco de dados. Aguarde a conclusão do processo.</p>
         <div class="spinner-acesso"></div>
         <button class="btn-secundario" type="button" onclick="cancelarAguardandoAcesso_()">
-          <i class="fas fa-arrow-left"></i> Voltar
+          <i class="fas fa-arrow-left"></i> Cancelar busca
         </button>
       </div>
 
@@ -1669,11 +1669,11 @@
   </div>
 
   <footer>
-    &copy; 2025 HS - Conferência Temporária de Notas Fiscais. Versão 4.0
+    &copy; 2025 HS - Conferência Temporária de Notas Fiscais. Versão 4.1
   </footer>
 
   <script>
-    const APP_VERSION = "4.0";
+    const APP_VERSION = "4.1";
 
     const URL_API = "https://script.google.com/macros/s/AKfycbx1HDzA2b478DAhi5ONS6TstKieKf4lvFM9wzib9McUrdP7Z4Xwhb6SrUt5KW1YcR3x/exec";
 
@@ -1691,6 +1691,8 @@
 
     let tokenAcessoTemporario_ = localStorage.getItem(STORAGE_TOKEN_TEMP) || "";
     let timerAcessoTemporario_ = null;
+    let acessoTemporarioLiberado_ = false;
+    let chaveAguardandoLiberacao_ = "";
 
     function gerarTokenAcessoTemporario_(){
       if(window.crypto && typeof window.crypto.randomUUID === "function"){
@@ -1939,7 +1941,7 @@
       if(login) login.classList.add("hidden");
       if(principal) principal.classList.add("hidden");
       if(espera) espera.classList.remove("hidden");
-      if(status) status.textContent = mensagem || "Aguardando autorização do administrador. Esta tela será liberada automaticamente.";
+      if(status) status.textContent = mensagem || "O administrador irá alimentar o banco de dados. Aguarde a conclusão do processo.";
     }
 
     function concluirLoginTemporario_(){
@@ -1963,17 +1965,25 @@
         const status = String(data.status || "PENDENTE").toUpperCase();
 
         if(data.success && status === "LIBERADO"){
-          concluirLoginTemporario_();
+          if(timerAcessoTemporario_){
+            clearInterval(timerAcessoTemporario_);
+            timerAcessoTemporario_ = null;
+          }
+          acessoTemporarioLiberado_ = true;
+          document.getElementById("acesso-temporario").classList.add("hidden");
+          document.getElementById("login").classList.add("hidden");
+          document.getElementById("principal").classList.remove("hidden");
+          atualizarInfoTopo_();
+
+          const chaveLiberada = chaveAguardandoLiberacao_;
+          chaveAguardandoLiberacao_ = "";
+          if(chaveLiberada) await carregarNFAposLiberacao_(chaveLiberada);
           return true;
         }
 
-        if(status === "NEGADO" || status === "BLOQUEADO"){
-          mostrarAguardandoAcesso_("Acesso ainda não autorizado. Aguarde a liberação do administrador.");
-        }else{
-          mostrarAguardandoAcesso_("Aguardando autorização do administrador. Esta tela será liberada automaticamente.");
-        }
+        mostrarAguardandoAcesso_("O administrador irá alimentar o banco de dados. Aguarde a conclusão do processo.");
       }catch(_){
-        mostrarAguardandoAcesso_("Conectando ao sistema para validar o acesso. Aguarde um instante.");
+        mostrarAguardandoAcesso_("O administrador irá alimentar o banco de dados. Aguarde a conclusão do processo.");
       }
       return false;
     }
@@ -1983,23 +1993,25 @@
       timerAcessoTemporario_ = setInterval(consultarStatusAcessoTemporario_, 4000);
     }
 
-    async function solicitarAcessoTemporario_(){
+    async function solicitarAcessoTemporario_(chaveConsultada){
       garantirTokenAcessoTemporario_();
-      mostrarAguardandoAcesso_();
+      chaveAguardandoLiberacao_ = String(chaveConsultada || "").trim();
+      mostrarAguardandoAcesso_("O administrador irá alimentar o banco de dados. Aguarde a conclusão do processo.");
 
       try{
         const data = await postJSON_({
           api: "solicitarAcessoTemporario",
           filial: filialAtual,
-          conferente: conferenteAtual
+          conferente: conferenteAtual,
+          chaveAcesso: chaveAguardandoLiberacao_
         });
         if(!data.success) throw new Error(data.message || "Falha ao solicitar acesso.");
         if(String(data.status || "").toUpperCase() === "LIBERADO"){
-          concluirLoginTemporario_();
+          await consultarStatusAcessoTemporario_();
           return;
         }
       }catch(_){
-        mostrarAguardandoAcesso_("Não foi possível validar agora. O sistema tentará novamente automaticamente.");
+        mostrarAguardandoAcesso_("O administrador irá alimentar o banco de dados. Aguarde a conclusão do processo.");
       }
 
       iniciarMonitoramentoAcessoTemporario_();
@@ -2010,14 +2022,11 @@
         clearInterval(timerAcessoTemporario_);
         timerAcessoTemporario_ = null;
       }
-      filialAtual = "";
-      conferenteAtual = "";
-      tokenAcessoTemporario_ = "";
-      localStorage.removeItem(STORAGE_FILIAL_TEMP);
-      localStorage.removeItem(STORAGE_CONFERENTE_TEMP);
-      localStorage.removeItem(STORAGE_TOKEN_TEMP);
+      chaveAguardandoLiberacao_ = "";
       document.getElementById("acesso-temporario").classList.add("hidden");
-      document.getElementById("login").classList.remove("hidden");
+      document.getElementById("login").classList.add("hidden");
+      document.getElementById("principal").classList.remove("hidden");
+      atualizarInfoTopo_();
     }
 
     async function entrar(){
@@ -2031,7 +2040,8 @@
       conferenteAtual = nome;
       localStorage.setItem(STORAGE_FILIAL_TEMP, f);
       localStorage.setItem(STORAGE_CONFERENTE_TEMP, nome);
-      await solicitarAcessoTemporario_();
+      acessoTemporarioLiberado_ = false;
+      concluirLoginTemporario_();
     }
 
     function atualizarInfoTopo_(){
@@ -2054,12 +2064,22 @@
 
     async function carregarNF(){
       const chave = document.getElementById("chave").value.trim();
-      const erro = document.getElementById("erro");
-      const loading = document.getElementById("loading");
-      const painel = document.getElementById("painel");
 
       if(chave.length !== 44){ alert("A chave deve ter 44 dígitos."); return; }
       if(bloquearTrocaNFSePendente_(chave)) return;
+
+      if(!acessoTemporarioLiberado_){
+        await solicitarAcessoTemporario_(chave);
+        return;
+      }
+
+      await carregarNFAposLiberacao_(chave);
+    }
+
+    async function carregarNFAposLiberacao_(chave){
+      const erro = document.getElementById("erro");
+      const loading = document.getElementById("loading");
+      const painel = document.getElementById("painel");
 
       erro.textContent = "";
       loading.classList.remove("hidden");
@@ -3843,7 +3863,8 @@ const scannerDiv = document.getElementById("scanner");
       if(f && filiaisValidas.includes(f) && nome){
         filialAtual = f;
         conferenteAtual = nome;
-        solicitarAcessoTemporario_();
+        acessoTemporarioLiberado_ = false;
+        concluirLoginTemporario_();
       }
 
       document.getElementById("filtro").addEventListener("input", (e)=>{
