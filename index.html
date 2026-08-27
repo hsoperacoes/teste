@@ -1669,11 +1669,11 @@
   </div>
 
   <footer>
-    &copy; 2025 HS - Conferência Temporária de Notas Fiscais. Versão 4.1
+    &copy; 2025 HS - Conferência Temporária de Notas Fiscais. Versão 4.3 - POR NF
   </footer>
 
   <script>
-    const APP_VERSION = "4.1";
+    const APP_VERSION = "4.3-POR-NF";
 
     const URL_API = "https://script.google.com/macros/s/AKfycbx1HDzA2b478DAhi5ONS6TstKieKf4lvFM9wzib9McUrdP7Z4Xwhb6SrUt5KW1YcR3x/exec";
 
@@ -1686,12 +1686,13 @@
     const MODO_TEMPORARIO = true;
     const STORAGE_FILIAL_TEMP = "filial_conf_nf_temp";
     const STORAGE_CONFERENTE_TEMP = "conferente_conf_nf_temp";
-    const STORAGE_TOKEN_TEMP = "token_conf_nf_temp";
+    const STORAGE_TOKEN_TEMP = "token_conf_nf_temp_por_nf_v2";
     const fetchOriginalTemporario_ = window.fetch.bind(window);
 
     let tokenAcessoTemporario_ = localStorage.getItem(STORAGE_TOKEN_TEMP) || "";
     let timerAcessoTemporario_ = null;
     let acessoTemporarioLiberado_ = false;
+    let chaveTemporariaLiberada_ = "";
     let chaveAguardandoLiberacao_ = "";
 
     function gerarTokenAcessoTemporario_(){
@@ -1960,16 +1961,18 @@
 
     async function consultarStatusAcessoTemporario_(){
       try{
-        const resp = await fetch(`${URL_API}?api=consultarAcessoTemporario&filial=${encodeURIComponent(filialAtual)}&t=${Date.now()}`);
+        const resp = await fetch(`${URL_API}?api=consultarAcessoTemporario&filial=${encodeURIComponent(filialAtual)}&chave=${encodeURIComponent(chaveAguardandoLiberacao_)}&t=${Date.now()}`);
         const data = await resp.json();
         const status = String(data.status || "PENDENTE").toUpperCase();
+        const chaveLiberadaServidor = String(data.chaveLiberada || "").trim();
 
-        if(data.success && status === "LIBERADO"){
+        if(data.success && status === "LIBERADO" && chaveLiberadaServidor === chaveAguardandoLiberacao_){
           if(timerAcessoTemporario_){
             clearInterval(timerAcessoTemporario_);
             timerAcessoTemporario_ = null;
           }
           acessoTemporarioLiberado_ = true;
+          chaveTemporariaLiberada_ = chaveLiberadaServidor;
           document.getElementById("acesso-temporario").classList.add("hidden");
           document.getElementById("login").classList.add("hidden");
           document.getElementById("principal").classList.remove("hidden");
@@ -1996,6 +1999,8 @@
     async function solicitarAcessoTemporario_(chaveConsultada){
       garantirTokenAcessoTemporario_();
       chaveAguardandoLiberacao_ = String(chaveConsultada || "").trim();
+      acessoTemporarioLiberado_ = false;
+      chaveTemporariaLiberada_ = "";
       mostrarAguardandoAcesso_("O administrador irá alimentar o banco de dados. Aguarde a conclusão do processo.");
 
       try{
@@ -2023,6 +2028,8 @@
         timerAcessoTemporario_ = null;
       }
       chaveAguardandoLiberacao_ = "";
+      acessoTemporarioLiberado_ = false;
+      chaveTemporariaLiberada_ = "";
       document.getElementById("acesso-temporario").classList.add("hidden");
       document.getElementById("login").classList.add("hidden");
       document.getElementById("principal").classList.remove("hidden");
@@ -2041,6 +2048,7 @@
       localStorage.setItem(STORAGE_FILIAL_TEMP, f);
       localStorage.setItem(STORAGE_CONFERENTE_TEMP, nome);
       acessoTemporarioLiberado_ = false;
+      chaveTemporariaLiberada_ = "";
       concluirLoginTemporario_();
     }
 
@@ -2068,7 +2076,7 @@
       if(chave.length !== 44){ alert("A chave deve ter 44 dígitos."); return; }
       if(bloquearTrocaNFSePendente_(chave)) return;
 
-      if(!acessoTemporarioLiberado_){
+      if(!acessoTemporarioLiberado_ || chaveTemporariaLiberada_ !== chave){
         await solicitarAcessoTemporario_(chave);
         return;
       }
@@ -3310,6 +3318,7 @@ const scannerDiv = document.getElementById("scanner");
         const data = await postJSON_({
           api:"buscarInfoEAN",
           filial: filialAtual,
+          chaveAcesso: String(cabecalhoAtual?.chaveAcesso || document.getElementById("chave").value || "").trim(),
           eans: listaEans
         });
         if(data.success && data.itens){
@@ -3513,6 +3522,9 @@ const scannerDiv = document.getElementById("scanner");
 
         conferenciaEnviadaAtual = true;
         envioConcluido = true;
+        acessoTemporarioLiberado_ = false;
+        chaveTemporariaLiberada_ = "";
+        chaveAguardandoLiberacao_ = "";
 
         // Limpa a NF concluída antes de mostrar o aviso. Ao fechar o aviso,
         // o conferente já encontra o campo vazio para ler a próxima nota.
@@ -3864,6 +3876,7 @@ const scannerDiv = document.getElementById("scanner");
         filialAtual = f;
         conferenteAtual = nome;
         acessoTemporarioLiberado_ = false;
+        chaveTemporariaLiberada_ = "";
         concluirLoginTemporario_();
       }
 
